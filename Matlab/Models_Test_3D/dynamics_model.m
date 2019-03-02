@@ -1,4 +1,4 @@
-function [ xkp1, Fk, Gammak ] = dynamics_model( k, xk, vk )
+function [ xkp1, Fk, Gammak ] = dynamics_model( xk, vk )
 % INS Dead-Reckoning Dynamics Model
 % 
 % INPUTS
@@ -36,15 +36,15 @@ Gammak = zeros(21,12);
 Gammak(3,1) = 1;
 Gammak(6,2) = 1;
 Gammak(9,3) = 1;
-Gammak(11,1) = 1;
-Gammak(13,1) = 1;
-Gammak(15,1) = 1;
-Gammak(16,1) = 1;
-Gammak(17,2) = 1;
-Gammak(18,3) = 1;
-Gammak(19,1) = 1;
-Gammak(20,2) = 1;
-Gammak(21,3) = 1;
+Gammak(11,4) = 1;
+Gammak(13,5) = 1;
+Gammak(15,6) = 1;
+Gammak(16,7) = 1;
+Gammak(17,8) = 1;
+Gammak(18,9) = 1;
+Gammak(19,10) = 1;
+Gammak(20,11) = 1;
+Gammak(21,12) = 1;
 
 xkp1 = Fk * xk + Gammak * vk;
 

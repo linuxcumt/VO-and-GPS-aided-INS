@@ -1,24 +1,26 @@
 function [ xkp1, Fk, Gammak ] = dynamics_model( k, xk, vk )
 % INS Dead-Reckoning Dynamics Model
 % 
-% INPUTS
-% k      - int
-%          time index
-% xk     - 21x1 double vector
-%          State vector at time k
-% vk     - 21x1 double vector
-%          Process Noise vector at time k
+% @arg
+% k         - int
+%             time index
+% xk        - 21x1 double vector
+%             State vector at time k
+% vk        - 21x1 double vector
+%             Process Noise vector at time k
+% derivflag - bool
+%             True to enable calculation of derivative
 % 
-% OUTPUTS
-% xkp1   - 11x1 double vector
-%          State vector at time k
-% Fk     - 11x11 double matrix
-%          State Transition partial derivative
-% Gammak - 11x11 double matrix
-%          State Noiise partial derivative
+% @return
+% xkp1      - 11x1 double vector
+%             State vector at time k
+% Fk        - 11x11 double matrix
+%             State Transition partial derivative
+% Gammak    - 11x11 double matrix
+%             State Noiise partial derivative
 % 
 % @author: Matt Marti
-% @date: 2019-02-25
+% @date: 2019-03-01
 
 global dt
 

@@ -1,29 +1,19 @@
 %% Filter_Test.m
 % 
-% 
 % This script tests the dynamics model and measurement model of the INS
-% algorithm I am working on for the Machine Learning project.
+% algorithm I am working on for the Machine Learning project. The INS will
+% implement an extended Kalman Filter that estimates the state goverened
+% by:
 % 
-%   x(k+1) = F*x(k) + Gamma*v(k)        - State Transition
-%   z(k+1) = H*x(k+1) + w(k+1)          - Measurement
+%   x(k+1) = f( k, x(k), v(k) )                - State Transition
+%   z(k+1) = h( k+1, x(k+1), w(k+1) )          - Measurement
 % 
-% In this example, a vehicle will be driving on a road in two dimensions.
-% The vehicle state will be modeled as the x1 and x2 position, velocity,
-% and acceleration components.
-% 
-% The point of this script is to show what it means that the Process Noise
-% Covariance (Q) needs to be tuned. It's not like the Measurement Noise
-% Covariance (R) that can be measured by taking the standard deviation of
-% sensor errors. There are rules of thumb to guess Q, but beyond that
-% there's no theoretical way to do it. I think that it would probably be a
-% good problem for machine learning.
-% 
-% DEPENDENCIES
-% zhist.mat
-% xhist.mat
+% @dependencies
+% dynamics_model.m    v 2019-03-01
+% measurement_model.m v 2019-03-01
 % 
 % @author: Matt Marti
-% @date: 2018-12-16
+% @date: 2019-03-01
 
 clear, clc, clear global
 global dt
@@ -34,11 +24,11 @@ global dt
 
 % Measurement Delta Time
 dt = .01;
-tof = 100;
+tof = 2;
 N = round(tof / dt);
 
 % Initial state
-x0 = [ 2; .3; -0.005; -1; -.2; .002; zeros(2,1); ...
+x0 = [ 2; 10; -0.005; -1; -2; .002; zeros(2,1); ...
     0.001; 0.002; -0.001];
 
 % Parameters
@@ -57,12 +47,12 @@ R = 1e-3*eye(nz);
 
 % Q - Process Noise Covariance
 Q = zeros(nv,nv);
-Q(1,1) = .01; % Accel
-Q(2,2) = .01; % Accel
-Q(3,3) = .02; % Gyro
-Q(4,4) = 0.00001; % Accel bias
-Q(5,5) = 0.00001; % Accel bias
-Q(6,6) = 0.00001; % Gyro bias
+Q(1,1) = .0001; % Accel
+Q(2,2) = .0001; % Accel
+Q(3,3) = .0002; % Gyro
+Q(4,4) = 0.00000001; % Accel bias
+Q(5,5) = 0.00000001; % Accel bias
+Q(6,6) = 0.00000001; % Gyro bias
 
 
 %% Generate Data
@@ -115,7 +105,7 @@ xhat0 = x0;
 % Initial Covariance estimate - This can be set pretty big and it will
 % converge fast for a linear system. Don't want it to be too small if you
 % think you're not accurate
-P0 = 5*eye(nx);
+P0 = eye(nx);
 
 % Preallocate data arrays
 xhathist = zeros(nx,N);
@@ -174,12 +164,11 @@ end
 % of truth data).
 
 % "1% of points may lie outside these bounds"
-alpha = 0.01;
+alpha = 0.05;
 
 % Chi-Squared Distribution Bounds for Innovation Statistic
 % These are displayed as red lines on the Innovation Statistic Mean Time
 % History. A certain percentage of points must lie within these bounds.
-nz = 4; % Number of Measurements
 r1nu = chi2inv(alpha/2, nz);
 r2nu = chi2inv(1-alpha/2, nz);
 
@@ -220,12 +209,12 @@ figure(1)
 hold off
 plot(xhist(1,:), xhist(4,:),'k.-', 'linewidth', 1.25, 'markersize', 10);
 hold on
-plot(zhist(1,:), zhist(3,:),'ro', 'markersize', 5);
 plot(xhathist(1,:), xhathist(4,:),'b.-', 'linewidth', 1.25, 'markersize', 10);
+% plot(zhist(1,:), zhist(3,:),'ro', 'markersize', 5);
 title('Object Ground Track');
 xlabel('x1');
 ylabel('y1');
-legend({'True', 'GPS','Kalman'});
+legend({'True','Kalman'});
 grid on, grid minor
 
 % Innovation Statistic Plot
@@ -249,9 +238,9 @@ grid on, grid minor;
 % Acceleration Time History
 figure(3);
 hold off
-plot(xhist([3,6,9],:)', 'b');
+plot(xhist([3,6],:)', 'b');
 hold on
-plot(xhathist([3,6,9],:)','r');
+plot(xhathist([3,6],:)','r');
 title('Acceleration Time History');
 legend({'True', '', '', 'Kalman', '', ''});
 grid on, grid minor
@@ -259,20 +248,20 @@ grid on, grid minor
 % Position Error
 figure(4);
 hold off
-plot((xhathist([1,4,7],:) - xhist([1,4,7],:))');
+plot((xhathist([1,4],:) - xhist([1,4],:))');
 title('Position Error Time History');
 grid on, grid minor
 
 % Velocity Error
 figure(5);
 hold off
-plot((xhathist([2,5,8],:) - xhist([2,5,8],:))');
+plot((xhathist([2,5],:) - xhist([2,5],:))');
 title('Velocity Error Time History');
 grid on, grid minor
 
 % Acceleration Error
 figure(6);
 hold off
-plot((xhathist([3,6,9],:) - xhist([3,6,9],:))');
+plot((xhathist([3,6],:) - xhist([3,6],:))');
 title('Acceleration Error Time History');
 grid on, grid minor

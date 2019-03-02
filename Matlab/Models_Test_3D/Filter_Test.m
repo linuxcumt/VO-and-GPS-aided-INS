@@ -1,29 +1,23 @@
 %% Filter_Test.m
 % 
-% 
 % This script tests the dynamics model and measurement model of the INS
-% algorithm I am working on for the Machine Learning project.
+% algorithm I am working on for the Machine Learning project. The INS will
+% implement an extended Kalman Filter that estimates the state goverened
+% by:
 % 
-%   x(k+1) = F*x(k) + Gamma*v(k)        - State Transition
-%   z(k+1) = H*x(k+1) + w(k+1)          - Measurement
+%   x(k+1) = f( k, x(k), v(k) )                - State Transition
+%   z(k+1) = h( k+1, x(k+1), w(k+1) )          - Measurement
 % 
-% In this example, a vehicle will be driving on a road in two dimensions.
-% The vehicle state will be modeled as the x1 and x2 position, velocity,
-% and acceleration components.
+% Note that the results of these tests are kind of bad because of the
+% initial guess of the state covariance matrix. I didn't put any effort
+% into making an educated guess, so it's a poor guess of the covariance.
 % 
-% The point of this script is to show what it means that the Process Noise
-% Covariance (Q) needs to be tuned. It's not like the Measurement Noise
-% Covariance (R) that can be measured by taking the standard deviation of
-% sensor errors. There are rules of thumb to guess Q, but beyond that
-% there's no theoretical way to do it. I think that it would probably be a
-% good problem for machine learning.
-% 
-% DEPENDENCIES
-% zhist.mat
-% xhist.mat
+% @dependencies
+% dynamics_model.m    v 2019-03-01
+% measurement_model.m v 2019-03-01
 % 
 % @author: Matt Marti
-% @date: 2018-12-16
+% @date: 2019-03-01
 
 clear, clc, clear global
 global dt
@@ -34,11 +28,11 @@ global dt
 
 % Measurement Delta Time
 dt = .01;
-tof = 100;
+tof = 2;
 N = round(tof / dt);
 
 % Initial state
-x0 = [ 2; .3; -0.005; -1; -.2; .002; -3; .3; 1; zeros(6,1); ...
+x0 = [ 2; .3; -0.005; -1; -.2; .002; 6700e3; .3; 1; zeros(6,1); ...
     0.001; 0.002; -0.001; 0.0001; 0.0005; -0.0002];
 
 % Parameters
@@ -47,10 +41,10 @@ nv = 12;
 nz = 6;
 
 % F - Dynamics Propagation function
-f = @(k, x, u, v) dynamics_model(k, x, v);
+f = @(k, x, u, v) dynamics_model( x, v );
 
 % H - Measurement Model
-h = @(k, x, w) measurement_model(k, x, w);
+h = @(k, x, w) measurement_model( x, w );
 
 % R - Measurement Noise Covariance
 R = 1e-3*eye(6);
@@ -60,15 +54,15 @@ Q = zeros(nv,nv);
 Q(1,1) = .01; % Accel
 Q(2,2) = .01; % Accel
 Q(3,3) = .01; % Accel
-Q(4,4) = .02; % Gyro
-Q(5,5) = .02; % Gyro
-Q(6,6) = .02; % Gyro
-Q(7,7) = 0.00001; % Accel bias
-Q(8,8) = 0.00001; % Accel bias
-Q(9,9) = 0.00001; % Accel bias
-Q(10,10) = 0.00001; % Gyro bias
-Q(11,11) = 0.00001; % Gyro bias
-Q(12,12) = 0.00001; % Gyro bias
+Q(4,4) = .002; % Gyro
+Q(5,5) = .002; % Gyro
+Q(6,6) = .002; % Gyro
+Q(7,7) = 0.0000001; % Accel bias
+Q(8,8) = 0.0000001; % Accel bias
+Q(9,9) = 0.0000001; % Accel bias
+Q(10,10) = 0.0000001; % Gyro bias
+Q(11,11) = 0.0000001; % Gyro bias
+Q(12,12) = 0.0000001; % Gyro bias
 
 
 %% Generate Data
@@ -121,7 +115,7 @@ xhat0 = x0;
 % Initial Covariance estimate - This can be set pretty big and it will
 % converge fast for a linear system. Don't want it to be too small if you
 % think you're not accurate
-P0 = 5*eye(nx);
+P0 = 1e-3*eye(nx);
 
 % Preallocate data arrays
 xhathist = zeros(nx,N);
@@ -185,7 +179,6 @@ alpha = 0.01;
 % Chi-Squared Distribution Bounds for Innovation Statistic
 % These are displayed as red lines on the Innovation Statistic Mean Time
 % History. A certain percentage of points must lie within these bounds.
-nz = 4; % Number of Measurements
 r1nu = chi2inv(alpha/2, nz);
 r2nu = chi2inv(1-alpha/2, nz);
 
@@ -226,12 +219,12 @@ figure(1)
 hold off
 plot(xhist(1,:), xhist(4,:),'k.-', 'linewidth', 1.25, 'markersize', 10);
 hold on
-plot(zhist(1,:), zhist(3,:),'ro', 'markersize', 5);
 plot(xhathist(1,:), xhathist(4,:),'b.-', 'linewidth', 1.25, 'markersize', 10);
+% plot(zhist(1,:), zhist(3,:),'ro', 'markersize', 5);
 title('Object Ground Track');
 xlabel('x1');
 ylabel('y1');
-legend({'True', 'GPS','Kalman'});
+legend({'True', 'Kalman'});
 grid on, grid minor
 
 % Innovation Statistic Plot
@@ -262,23 +255,57 @@ title('Acceleration Time History');
 legend({'True', '', '', 'Kalman', '', ''});
 grid on, grid minor
 
-% Position Error
+% Acceleration Bias Error
 figure(4);
+hold off
+plot(xhathist(16:18,:)', 'b');
+hold on
+plot(xhist(16:18,:)', 'r');
+title('Acceleration Bias Time History');
+legend({'True', '', '', 'Kalman', '', ''});
+grid on, grid minor
+
+% Gyro Bias Error
+figure(5);
+hold off
+plot(xhathist(19:21,:)', 'b');
+hold on
+plot(xhist(19:21,:)', 'r');
+title('Gyro Bias Time History');
+legend({'True', '', '', 'Kalman', '', ''});
+grid on, grid minor
+
+% Position Error
+figure(6);
 hold off
 plot((xhathist([1,4,7],:) - xhist([1,4,7],:))');
 title('Position Error Time History');
 grid on, grid minor
 
 % Velocity Error
-figure(5);
+figure(7);
 hold off
 plot((xhathist([2,5,8],:) - xhist([2,5,8],:))');
 title('Velocity Error Time History');
 grid on, grid minor
 
 % Acceleration Error
-figure(6);
+figure(8);
 hold off
 plot((xhathist([3,6,9],:) - xhist([3,6,9],:))');
 title('Acceleration Error Time History');
+grid on, grid minor
+
+% Acceleration Bias Error
+figure(9);
+hold off
+plot(xhathist(16:18,:)' - xhist(16:18,:)');
+title('Acceleration Bias Error Time History');
+grid on, grid minor
+
+% Gyro Bias Error
+figure(10);
+hold off
+plot(xhathist(19:21,:)' - xhist(19:21,:)');
+title('Gyro Bias Error Time History');
 grid on, grid minor
