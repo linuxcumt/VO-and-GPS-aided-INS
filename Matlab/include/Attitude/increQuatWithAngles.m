@@ -16,7 +16,7 @@ theta = sqrt(thetax^2 + thetay^2 + thetaz^2);
 
 % Sine and Cosine things
 halftheta = 0.5*theta;
-s = sin(halftheta) / halftheta;
+s = insSinc(halftheta);
 c = 2*(cos(halftheta) - 1);
 
 % Quaternion update

@@ -3,6 +3,7 @@
 % Runs all unit tests in the "include/Test" folder
 % 
 % @author: Matt Marti
+% @date: 2019-03-05
 
 clear, clc, clear global
 constants
@@ -16,6 +17,8 @@ Test_trapazoidIntegration
 
 % Attitude
 Test_quat2dircos
+Test_insSinc
+% Test_increQuatWithAngles
 
 % Geod
 Test_ecef2latlon
@@ -23,6 +26,7 @@ Test_latlon2ecef
 
 % InertialNavigation
 Test_gravitymodel
+Test_insMechanization
 
 
 %% Out
