@@ -1,10 +1,9 @@
-function [ xkp1, Fk, Gammak ] = dynamics_model( dt, xk, vk )
+function [ xkp1, Fk, Gammak ] = dynamics_model( xk, vk )
 % INS Dead-Reckoning Dynamics Model
 % 
 % INPUTS
-% k      - double
-%          Delta time between state updates. Recommended to be INS
-%          measurement rate.
+% k      - int
+%          time index
 % xk     - 21x1 double vector
 %          State vector at time k
 % vk     - 21x1 double vector
@@ -20,6 +19,8 @@ function [ xkp1, Fk, Gammak ] = dynamics_model( dt, xk, vk )
 % 
 % @author: Matt Marti
 % @date: 2019-02-25
+
+global dt
 
 % State Transition Partial Derivative
 Fk = zeros(21,21);
