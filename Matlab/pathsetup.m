@@ -21,7 +21,7 @@ dirstruct = dir(str);
 for i = 3:length(dirstruct)
     d = dirstruct(i);
     dirname = [str '/' d.name];
-    if isfolder(dirname)
+    if exist(dirname, 'dir')
         recursiveadd( dirname );
     end
 end

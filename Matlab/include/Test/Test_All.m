@@ -3,7 +3,7 @@
 % Runs all unit tests in the "include/Test" folder
 % 
 % @author: Matt Marti
-% @date: 2019-03-05
+% @date: 2019-03-06
 
 clear, clc, clear global
 constants

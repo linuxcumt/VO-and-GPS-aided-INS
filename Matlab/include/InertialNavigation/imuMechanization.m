@@ -55,14 +55,14 @@ if nargin < 5
 end
 
 % State variables
-rk_e   = xk([1,4,7],1);       % Position
-vk_e   = xk([2,5,8],1);       % Velocity
-ak_e   = xk([3,6,9],1);       % Acceleration
-qk_e_b = xk([10,11,12,13],1); % Orientation
-betaa  = xk([14,15,16],1);    % Accel bias estimate
-scalea = xk([17,18,19],1);    % Accel Scale Factor error estimate
-betag  = xk([20,21,22],1);    % Accel bias estimate
-scaleg = xk([23,24,25],1);    % Accel Scale Factor error estimate
+rk_e   = xk([1,4,7],1);    % Position
+vk_e   = xk([2,5,8],1);    % Velocity
+ak_e   = xk([3,6,9],1);    % Acceleration
+qk_e_b = xk(10:13,1);      % Orientation
+betaa  = xk([14,15,16],1); % Accel bias estimate
+scalea = xk([17,18,19],1); % Accel Scale Factor error estimate
+betag  = xk([20,21,22],1); % Accel bias estimate
+scaleg = xk([23,24,25],1); % Accel Scale Factor error estimate
 
 % Measurment variables
 dvf_m_raw = zk(1:3); % Raw Specific Force / Acceleration
@@ -109,36 +109,17 @@ vkp1_e = vk_e + ak_e*dt;
 rkp1_e = rk_e + vk_e*dt + 0.5*ak_e*dt^2;
 
 % 11. Convert position to Latitude and Longitude
-latlonalt = ecef2latlon(rkp1_e);
-
 % 12. Local Frame to ECEF Frame Rotation
-lat = latlonalt(1);
-slat = sind(lat);
-clat = cosd(lat);
-Rlat = [ clat, 0, -slat; 0, 1, 0; slat, 0, clat ];
-lon = latlonalt(2);
-slon = sind(lon);
-clon = cosd(lon);
-Rlon = [ clon, slon, 0; -slon, clon, 0; 0, 0, 1 ];
-Renvframe = [ 0, -1, 0; 1, 0, 0; 0, 0, 1 ];
-R_e_l = Renvframe * Rlat * Rlon;
-R_b_l = R_b_e * R_e_l;
-R_l_b = R_b_l';
-
 % 13. Attitude
-head = mod(90 + real(atan2d( - R_l_b(3,1), R_l_b(3,3) )), 360);
-pitc = - real(asind( R_l_b(3,2)));
-roll = real(atan2d( - R_l_b(1,2), R_l_b(2,2) ));
-attitude = [ head; pitc; roll ];
-
+[ latlonalt, attitude ] = rq2attitude( rkp1_e, qkp1_e_b );
 
 % Update State variables
 xkp1 = zeros(25,1);
-xkp1([1,4,7],1)       = rkp1_e;      % Position
-xkp1([2,5,8],1)       = vkp1_e;      % Velocity
-xkp1([3,6,9],1)       = akp1_e;      % Delta Velocity
-xkp1([10,11,12,13],1) = qkp1_e_b;    % Orientation
-xkp1(14:25,1)         = xk(14:25,1); % Bias and scale factors
+xkp1([1,4,7],1) = rkp1_e;      % Position
+xkp1([2,5,8],1) = vkp1_e;      % Velocity
+xkp1([3,6,9],1) = akp1_e;      % Delta Velocity
+xkp1(10:13,1)   = qkp1_e_b;    % Orientation
+xkp1(14:25,1)   = xk(14:25,1); % Bias and scale factors
 
 end
 
