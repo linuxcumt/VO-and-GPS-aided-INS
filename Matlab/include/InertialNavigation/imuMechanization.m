@@ -1,4 +1,4 @@
-function [ xkp1, latlonalt, attitude ] ...
+function [ xkp1, latlonalt, attitude, acc, gyr ] ...
     = imuMechanization( dt, xk, zk, R_b_m, deltaflag )
 % Updates IMU State from k time to k+1 time
 % Implements the mechanization equations for the INS state transition.
@@ -17,7 +17,7 @@ function [ xkp1, latlonalt, attitude ] ...
 % 
 % @arg
 % dt        - double
-% xk        - 25 x 1 double matrix
+% xk        - 22 x 1 double matrix
 %             INS State vector
 % zk        - 6 x 1 double matrix
 %             Measurement vector
@@ -33,7 +33,7 @@ function [ xkp1, latlonalt, attitude ] ...
 %             rate and acceleration. Default to false
 % 
 % @return
-% xkp1      - 25 x 1 double matrix
+% xkp1      - 22 x 1 double matrix
 %             State vector at k+1 state
 % latlonalt - 3 x 1 double matrix
 %             IMU [ Latitude; Longitude; Altitude ]
@@ -55,14 +55,13 @@ if nargin < 5
 end
 
 % State variables
-rk_e   = xk([1,4,7],1);    % Position
-vk_e   = xk([2,5,8],1);    % Velocity
-ak_e   = xk([3,6,9],1);    % Acceleration
-qk_e_b = xk(10:13,1);      % Orientation
-betaa  = xk([14,15,16],1); % Accel bias estimate
-scalea = xk([17,18,19],1); % Accel Scale Factor error estimate
-betag  = xk([20,21,22],1); % Accel bias estimate
-scaleg = xk([23,24,25],1); % Accel Scale Factor error estimate
+rk_e   = xk([1,3,5],1);    % Position
+vk_e   = xk([2,4,6],1);    % Velocity
+qk_e_b = xk(7:10,1);      % Orientation
+betaa  = xk([11,12,13],1); % Accel bias estimate
+scalea = xk([14,15,16],1); % Accel Scale Factor error estimate
+betag  = xk([17,18,19],1); % Accel bias estimate
+scaleg = xk([20,21,22],1); % Accel Scale Factor error estimate
 
 % Measurment variables
 dvf_m_raw = zk(1:3); % Raw Specific Force / Acceleration
@@ -101,8 +100,8 @@ gf_e = gravitymodel(rk_e);
 wf_e = centrifugalmodel(rk_e);
 
 % 8. Apply coriolis and gravity models to acceleration
-dvkp1_e = dvf_e - dt * (gf_e + wf_e - cf_e);
-akp1_e = dvkp1_e / dt;
+dvk_e = dvf_e - dt * (gf_e + wf_e - cf_e);
+ak_e = dvk_e / dt;
 
 % 9. & 10. Velocity and Position update
 vkp1_e = vk_e + ak_e*dt;
@@ -114,12 +113,15 @@ rkp1_e = rk_e + vk_e*dt + 0.5*ak_e*dt^2;
 [ latlonalt, attitude ] = rq2attitude( rkp1_e, qkp1_e_b );
 
 % Update State variables
-xkp1 = zeros(25,1);
-xkp1([1,4,7],1) = rkp1_e;      % Position
-xkp1([2,5,8],1) = vkp1_e;      % Velocity
-xkp1([3,6,9],1) = akp1_e;      % Delta Velocity
-xkp1(10:13,1)   = qkp1_e_b;    % Orientation
-xkp1(14:25,1)   = xk(14:25,1); % Bias and scale factors
+xkp1 = zeros(22,1);
+xkp1([1,3,5],1) = rkp1_e;      % Position
+xkp1([2,4,6],1) = vkp1_e;      % Velocity
+xkp1(7:10,1)    = qkp1_e_b;    % Orientation
+xkp1(11:22,1)   = xk(11:22,1); % Bias and scale factors
+
+% Output corrected acceleration and angular rate
+acc = ak_e;
+gyr = theta_b_eb/dt;
 
 end
 

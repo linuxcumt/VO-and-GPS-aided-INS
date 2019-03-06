@@ -32,16 +32,16 @@ dt = 1e-2;
 R_b_m = eye(3);
 
 % Initialize state
-x0 = zeros(25,1);
-x0([1,4,7],1) = [1; 2; 3]; % Arbitrary position vector
-x0([10,11,12,13],1) = [1; 0; 0; 0]; % Identity rotation matrix
+x0 = zeros(22,1);
+x0([1,3,5],1) = [1; 2; 3]; % Arbitrary position vector
+x0(7:10,1) = [1; 0; 0; 0]; % Identity rotation matrix
 
 % Initialize measurements
 N = 100;
 zhist = zeros(6,N);
 
 % Run simulation
-xhist = 1324*ones(25,N);
+xhist = 1324*ones(22,N);
 xk = x0;
 for i = 1:N
     zk = zhist(:,i);
@@ -54,7 +54,7 @@ end
 % Assert state does not change for stationary massless Earth
 p = 1e-9;
 for i = 1:N
-    for j = 1:25
+    for j = 1:22
         assert(abs(xhist(j,i) - x0(j)) < p, 'Bad state');
     end
 end
@@ -70,12 +70,12 @@ dt = 1e-2; % [s]
 R_b_m = eye(3);
 
 % Initialize state
-x0 = zeros(25,1);
-x0([1,4,7],1) = [100; 0; 0]; % Arbitrary position vector
-x0([2,5,8],1) = [2; 0; 0]; % Arbitrary velocity vector
+x0 = zeros(22,1);
+x0([1,3,5],1) = [100; 0; 0]; % Arbitrary position vector
+x0([2,4,6],1) = [2; 0; 0]; % Arbitrary velocity vector
 q = [1; 0; 0; 0]; % Set heading, pitch, roll to 0
 q = q/norm(q); % Normalize quaternion
-x0([10,11,12,13],1) = q; % Attitude
+x0(7:10,1) = q; % Attitude
 
 % Acceleartion
 T = 5; % [s]
@@ -91,7 +91,7 @@ zhist = zeros(6,N);
 zhist(1,:) = acc; % IMU accelerates up
 
 % Run simulation
-xhist = 1324*ones(25,N);
+xhist = 1324*ones(22,N);
 xk = x0;
 for i = 1:N
     zk = zhist(:,i);
@@ -104,7 +104,7 @@ end
 % Assert state does not change for all but x axis parameters
 p = 1e-9;
 for i = 1:N
-    for j = 4:25
+    for j = 3:22
         assert(abs(xhist(j,i) - x0(j)) < p, 'Bad state');
     end
 end
@@ -130,11 +130,11 @@ R_b_m = eye(3);
 T = 1.5;
 
 % Initialize state
-x0 = zeros(25,1);
-x0([1,4,7],1) = 6400e3*[1; 0; 0]; % Arbitrary position vector
+x0 = zeros(22,1);
+x0([1,3,5],1) = 6400e3*[1; 0; 0]; % Arbitrary position vector
 q = [1; 0; 0; 0]; % Set heading, pitch, roll to 0
 q = q/norm(q); % Normalize quaternion
-x0([10,11,12,13],1) = q; % Attitude
+x0(7:10,1) = q; % Attitude
 
 % Rotation Rate:
 d1 = -90;
@@ -150,7 +150,7 @@ zhist = zeros(6,N);
 zhist(5,:) = z; % Apply rotation to y axis gyro
 
 % Run simulation
-xhist = 1324*ones(25,N);
+xhist = 1324*ones(22,N);
 attitudehist = zeros(3,N);
 xk = x0;
 for i = 1:N
@@ -166,7 +166,7 @@ x0_90_0_0 = xhist(:,end);
 % Assert state does not change for stationary massless Earth
 p = 1e-9;
 for i = 1:N
-    for j = [1:9, 14:25]
+    for j = [1:6, 11:22]
         assert(abs(xhist(j,i) - x0(j)) < p, 'Bad state');
     end
 end
@@ -230,7 +230,7 @@ zhist = zeros(6,N);
 zhist(4,:) = z; % Rotate about x axis
 
 % Run simulation
-xhist = 1324*ones(25,N);
+xhist = 1324*ones(22,N);
 attitudehist = zeros(3,N);
 xk = x0;
 for i = 1:N
@@ -245,7 +245,7 @@ end
 % Assert state does not change for stationary massless Earth
 p = 1e-9;
 for i = 1:N
-    for j = [1:9, 14:25]
+    for j = [1:6, 11:22]
         assert(abs(xhist(j,i) - x0(j)) < p, 'Bad state');
     end
 end
@@ -282,7 +282,7 @@ zhist = zeros(6,N);
 zhist(6,:) = z; % Rotate on z axis
 
 % Run simulation
-xhist = 1324*ones(25,N);
+xhist = 1324*ones(22,N);
 attitudehist = zeros(3,N);
 xk = x0;
 for i = 1:N
@@ -297,7 +297,7 @@ end
 % Assert state does not change for stationary massless Earth
 p = 1e-9;
 for i = 1:N
-    for j = [1:9, 14:25]
+    for j = [1:6, 11:22]
         assert(abs(xhist(j,i) - x0(j)) < p, 'Bad state');
     end
 end
