@@ -1,4 +1,4 @@
-function [ zk, Hk ] = measurement_model_INS( xk, wk )
+function [ zk, Hk ] = measurement_model( xk, wk )
 % INS Dead-Reckoning Measurement Model
 % 
 % INPUTS
@@ -10,9 +10,9 @@ function [ zk, Hk ] = measurement_model_INS( xk, wk )
 %           Measurement Noise vector at time k
 % 
 % OUTPUTS
-% zk      - 6x1 double vector
+% zbarkp1 - 6x1 double vector
 %           Measurement prediction
-% Hk      - 6x21 double matrix
+% Hkp1    - 6x21 double matrix
 %           Measurement partial derivative
 % 
 % @author: Matt Marti
@@ -20,7 +20,7 @@ function [ zk, Hk ] = measurement_model_INS( xk, wk )
 
 % Constants
 nx = 21;
-nz = 6;
+nz = 12;
 g0 = -9.81;
 
 % Pertinent elements of state vector
@@ -90,8 +90,9 @@ gamma = [gamma1; gamma2; gamma3];
 
 % Measurement prediction
 zk = zeros(nz,1);
-zk(1:3) = acc + beta + g;
-zk(4:6) = gyr + gamma;
+zk(1:6) = [x1; x1d; x2; x2d; x3; x3d];
+zk(7:9) = acc + beta + g;
+zk(10:12) = gyr + gamma;
 zk = zk + wk;
 
 
@@ -106,13 +107,13 @@ for i = 1:nx
 
     % Activate partial derivatives
     dx1_ds     = switchmatrix(1,i);
-    dx1d_ds    = switchmatrix(2,i); %#ok
+    dx1d_ds    = switchmatrix(2,i);
     dx1dd_ds   = switchmatrix(3,i);
     dx2_ds     = switchmatrix(4,i);
-    dx2d_ds    = switchmatrix(5,i); %#ok
+    dx2d_ds    = switchmatrix(5,i);
     dx2dd_ds   = switchmatrix(6,i);
     dx3_ds     = switchmatrix(7,i);
-    dx3d_ds    = switchmatrix(8,i); %#ok
+    dx3d_ds    = switchmatrix(8,i);
     dx3dd_ds   = switchmatrix(9,i);
     dpsi_ds    = switchmatrix(10,i);
     dpsid_ds   = switchmatrix(11,i);
@@ -170,8 +171,9 @@ for i = 1:nx
     dgamma_ds = [dgamma1_ds; dgamma2_ds; dgamma3_ds];
 
     % Assign Derivative
-    Hk(1:3,i) = dacc_ds + dbeta_ds + dg_ds;
-    Hk(4:6,i) = dgyr_ds + dgamma_ds;
+    Hk(1:6,i) = [dx1_ds; dx1d_ds; dx2_ds; dx2d_ds; dx3_ds; dx3d_ds];
+    Hk(7:9,i) = dacc_ds + dbeta_ds + dg_ds;
+    Hk(10:12,i) = dgyr_ds + dgamma_ds;
 end
 
 end

@@ -39,9 +39,13 @@ function [ xkp1, latlonalt, attitude, acc, gyr ] ...
 %             IMU [ Latitude; Longitude; Altitude ]
 % attitude  - 3 x 1 double matrix
 %             IMU Attitude [ Heading; Pitch; Roll ]
+% acc       - 3 x 1 double matrix
+%             ECEF acceleration vector
+% gyr       - 3 x 1 double matrix
+%             Body frame rotation rate vector
 % 
 % @author: Matt Marti
-% @date: 2019-03-04
+% @date: 2019-03-07
 
 % Constants
 global OMEGA_EARTH
