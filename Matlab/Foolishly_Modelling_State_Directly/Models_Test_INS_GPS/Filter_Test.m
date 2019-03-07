@@ -31,16 +31,16 @@ clear, clc, clear global
 % Refer to the notebook for the models
 
 % Measurement Delta Time
-dt_INS = .01;
-dt_GPS = .2;
-tof = 50;
+dt_INS = .04;
+dt_GPS = 1;
+tof = 100;
 Nx = round(tof / dt_INS);
 Nz_INS = Nx;
 Nz_GPS = round(tof / dt_GPS);
 
 % Initial state
 x0 = [ 2; .3; -0.005; -1; -.2; .002; 6700e3; .3; 1; zeros(6,1); ...
-    0.001; 0.002; -0.001; 0.0001; 0.0005; -0.0002];
+    .7; 0.2; -0.3; 0.1; 0.5; -0.2];
 
 % Parameters
 nx = 21;
@@ -57,22 +57,22 @@ h_GPS = @(k, x, w) measurement_model_GPS( x, w );
 
 % R - Measurement Noise Covariance
 R_INS = 1e-3*eye(6);
-R_GPS = diag([5;.01;5;.01;7;.02]);
+R_GPS = diag([5;.1;5;.1;7;.2]);
 
 % Q - Process Noise Covariance
 Q = zeros(nv,nv);
-Q(1,1) = .01; % Accel
-Q(2,2) = .01; % Accel
-Q(3,3) = .01; % Accel
-Q(4,4) = .002; % Gyro
-Q(5,5) = .002; % Gyro
-Q(6,6) = .002; % Gyro
-Q(7,7) = 0.0000001; % Accel bias
-Q(8,8) = 0.0000001; % Accel bias
-Q(9,9) = 0.0000001; % Accel bias
-Q(10,10) = 0.0000001; % Gyro bias
-Q(11,11) = 0.0000001; % Gyro bias
-Q(12,12) = 0.0000001; % Gyro bias
+Q(1,1) = 1e-4; % Accel
+Q(2,2) = 1e-4; % Accel
+Q(3,3) = 1e-4; % Accel
+Q(4,4) = 1e-4; % Gyro
+Q(5,5) = 1e-4; % Gyro
+Q(6,6) = 1e-4; % Gyro
+Q(7,7) = 1e-10/dt_INS; % Accel bias
+Q(8,8) = 1e-10/dt_INS; % Accel bias
+Q(9,9) = 1e-10/dt_INS; % Accel bias
+Q(10,10) = 1e-10/dt_INS; % Gyro bias
+Q(11,11) = 1e-10/dt_INS; % Gyro bias
+Q(12,12) = 1e-10/dt_INS; % Gyro bias
 
 
 %% Generate Data
@@ -128,12 +128,11 @@ end
 % Initial state estimate - assume we are starting from the first GPS
 % measurement
 xhatk = x0;
-xhatk(11) = xhatk(11) + .15*pi;
 
 % Initial Covariance estimate - This can be set pretty big and it will
 % converge fast for a linear system. Don't want it to be too small if you
 % think you're not accurate
-Pk = 1e-2*eye(nx);
+Pk = 1e-1*eye(nx);
 
 % Preallocate data arrays
 xhathist = zeros(nx,Nx);
@@ -275,7 +274,7 @@ semilogy(r1nu_mean*ones(size(epsilonhist)), 'm--', 'linewidth', 1.75);
 semilogy(r2nu_mean*ones(size(epsilonhist)), 'm--', 'linewidth', 1.75);
 semilogy(mean(epsilonhist)*ones(size(epsilonhist)), 'b-.', ...
     'linewidth', 1);
-semilogy(nz_INS*ones(size(epsilonhist)), 'k-.', 'linewidth', 1);
+semilogy(nz*ones(size(epsilonhist)), 'k-.', 'linewidth', 1);
 hold off;
 title('Innovation Statistic Consistency Test Time History');
 ylabel('Innovation Statistic');
