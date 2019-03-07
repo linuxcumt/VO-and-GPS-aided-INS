@@ -8,21 +8,21 @@
 %   x(k+1) = f( k, x(k), v(k) )                - State Transition
 %   z(k+1) = h( k+1, x(k+1), w(k+1) )          - Measurement
 % 
-% This script implements a loosely coupled GPS aided INS. The GPS sample
-% rate is lower than that of the INS, so using the observations to estimate
-% the state is a little tricky. GPS provides position measurements.
-% 
 % Note that the results of these tests are kind of bad because of the
 % initial guess of the state covariance matrix. I didn't put any effort
 % into making an educated guess, so it's a poor guess of the covariance.
 % 
+% This script is for funzies. I want to see how well the INS works if the
+% GPS happens at the same rate and if I fudge the Loosely coupled filter.
+% I'm doing this to procrastinate implementing the one from the guy's
+% thesis.
+% 
 % @dependencies
-% dynamics_model.m        v 2019-03-01
-% measurement_model_INS.m v 2019-03-01
-% measurement_model_GPS.m v 2019-03-02
+% dynamics_model.m    v 2019-03-01
+% measurement_model.m v 2019-03-01
 % 
 % @author: Matt Marti
-% @date: 2019-03-07
+% @date: 2019-03-01
 
 clear, clc, clear global
 
@@ -31,12 +31,9 @@ clear, clc, clear global
 % Refer to the notebook for the models
 
 % Measurement Delta Time
-dt_INS = .01;
-dt_GPS = .2;
-tof = 50;
-Nx = round(tof / dt_INS);
-Nz_INS = Nx;
-Nz_GPS = round(tof / dt_GPS);
+dt = 1;
+tof = 1000;
+N = round(tof / dt);
 
 % Initial state
 x0 = [ 2; .3; -0.005; -1; -.2; .002; 6700e3; .3; 1; zeros(6,1); ...
@@ -47,17 +44,18 @@ nx = 21;
 nv = 12;
 nz_INS = 6;
 nz_GPS = 6;
+nz = nz_INS + nz_GPS;
 
 % F - Dynamics Propagation function
-f = @(k, x, u, v) dynamics_model( dt_INS, x, v );
+f = @(k, x, u, v) dynamics_model( dt, x, v );
 
 % H - Measurement Model
-h_INS = @(k, x, w) measurement_model_INS( x, w );
-h_GPS = @(k, x, w) measurement_model_GPS( x, w );
+h = @(k, x, w) measurement_model( x, w );
 
 % R - Measurement Noise Covariance
 R_INS = 1e-3*eye(6);
-R_GPS = diag([5;.01;5;.01;7;.02]);
+R_GPS = diag([5;.1;5;.1;7;.2]);
+R = [R_GPS, zeros(nz_GPS,nz_INS); zeros(nz_INS,nz_GPS), R_INS];
 
 % Q - Process Noise Covariance
 Q = zeros(nv,nv);
@@ -77,45 +75,35 @@ Q(12,12) = 0.0000001; % Gyro bias
 
 %% Generate Data
 
-% Generate INS True Measurment Noise
-Sr_INS = chol(R_INS)';
-whist_INS = Sr_INS*randn(nz_INS,Nz_INS);
-
-% Generate INS True Measurment Noise
-Sr_GPS = chol(R_GPS)';
-whist_GPS = Sr_GPS*randn(nz_GPS,Nz_GPS);
+% Generate True Measurment Noise
+Sr = chol(R)';
+whist = Sr*randn(nz,N);
 
 % Generate True Process Noise
 Sq = chol(Q)';
 v0 = Sq*randn(nv,1);
-vhist = Sq*randn(nv,Nx);
+vhist = Sq*randn(nv,N);
 
 % Preallocate data arrays
-xhist = zeros(nx,Nx);
-zhist_INS = zeros(nz_INS,Nz_INS);
-zhist_GPS = zeros(nz_GPS,Nz_GPS);
+xhist = zeros(nx,N);
+zhist = zeros(nz,N);
 
 % Generate data
 xk = x0;
 vk = v0;
-kp1gps = 1;
-for kp1 = 1:Nx
+for kp1 = 1:N
     k = kp1 - 1;
     
-    % State Propagation
+    % Current state data
+    wkp1 = whist(:,kp1);
+    
+    % Compute process
     xkp1 = f(k, xk, 0, vk);
+    zkp1 = h(kp1, xkp1, wkp1);
+    
+    % Save data
     xhist(:,kp1) = xkp1;
-    
-    % INS Observation
-    wkp1_INS = whist_INS(:,kp1);
-    zhist_INS(:,kp1) = h_INS(kp1, xkp1, wkp1_INS);
-    
-    % GPS Observation
-    if ~mod(kp1-1,round(dt_GPS/dt_INS))
-        wkp1_GPS = whist_GPS(:,kp1gps);
-        zhist_GPS(:,kp1gps) = h_GPS(kp1gps, xkp1, wkp1_GPS);
-        kp1gps = kp1gps + 1;
-    end
+    zhist(:,kp1) = zkp1;
     
     % Iterate state data
     xk = xkp1;
@@ -125,70 +113,56 @@ end
 
 %% Run Filter on System
 
+% Load measurement time history
+N = size(zhist,2);
+
 % Initial state estimate - assume we are starting from the first GPS
 % measurement
-xhatk = x0;
-xhatk_GPS = x0;
+xhat0 = x0;
 
 % Initial Covariance estimate - This can be set pretty big and it will
 % converge fast for a linear system. Don't want it to be too small if you
 % think you're not accurate
-Pk = 1e-2*eye(nx);
+P0 = 1e-3*eye(nx);
 
 % Preallocate data arrays
-xhathist = zeros(nx,Nx);
-Phist = zeros(nx,nx,Nx);
-epsilonhist = zeros(1,Nx);
+xhathist = zeros(nx,N);
+Phist = zeros(nx,nx,N);
+epsilonhist = zeros(1,N);
 
 % Initialize loop variables
+xhatk = xhat0;
+Pk = P0;
 Qk = Q;
+Rkp1 = R;
 
 % Run Filter
-kp1gps = 1;
-for kp1 = 1:Nx % Index by k+1
+for kp1 = 1:N % Index by k+1
     k = kp1 - 1;
-    gpsflag = ~mod(kp1-1,round(dt_GPS/dt_INS));
+    
+    % Obtain Measurement Data
+    zkp1 = zhist(:,kp1);
     
     % State propagation
     [ xbarkp1, Fk, Gammak ] = f(k, xhatk, 0, zeros(nv,1));
-    
-    % Inertial measurments
-    zkp1 = zhist_INS(:,kp1);
-    [ zbarkp1, Hkp1 ] = h_INS(kp1, xbarkp1, 0);
-    Rkp1 = R_INS;
-    
-    % Obtain Measurement Data
-    if gpsflag
-        
-        % GPS measurments
-        zkp1_GPS = zhist_GPS(:,kp1gps);
-        [ zbarkp1_GPS, Hkp1_GPS ] = h_GPS(kp1gps, xbarkp1, 0);
-        kp1gps = kp1gps + 1;
-        
-        % Combine measurements
-        zkp1 = [ zkp1_GPS; zkp1 ]; %#ok
-        zbarkp1 = [ zbarkp1_GPS; zbarkp1 ]; %#ok
-        Hkp1 = [ Hkp1_GPS; Hkp1 ]; %#ok
-        Rkp1 = [ R_GPS,                zeros(nz_GPS,nz_INS) ; ...
-                 zeros(nz_INS,nz_GPS), Rkp1                 ]; %#ok
-    end
+    [ zbarkp1, Hkp1 ] = h(kp1, xbarkp1, 0);
     
     % Dynamic propagation of covariance
-    Pbarkp1_INS = Fk*Pk*(Fk') + Gammak*Qk*(Gammak');
+    Pbarkp1 = Fk*Pk*(Fk') + Gammak*Qk*(Gammak');
 
     % Kalman Gain calculation
     nukp1 = zkp1 - zbarkp1;
-    Skp1 = Hkp1*Pbarkp1_INS*(Hkp1') + Rkp1;
+    Skp1 = Hkp1*Pbarkp1*(Hkp1') + Rkp1;
     invSkp1 = inv(Skp1);
-    Wkp1 = Pbarkp1_INS*(Hkp1')*invSkp1; %#ok
+    Wkp1 = Pbarkp1*(Hkp1')*invSkp1; %#ok
 
     % Innovation Statistic
     epsilonkp1 = (nukp1')*invSkp1*nukp1; %#ok
 
     % Measurement update of state covariance
     xhatkp1 = xbarkp1 + Wkp1*nukp1;
-    Pkp1 = Pbarkp1_INS - Wkp1*Skp1*(Wkp1');
-    
+    Pkp1 = Pbarkp1 - Wkp1*Skp1*(Wkp1');
+
     % Save data
     xhathist(:,kp1) = xhatkp1;
     Phist(:,:,kp1) = Pkp1;
@@ -197,10 +171,6 @@ for kp1 = 1:Nx % Index by k+1
     % Iterate
     xhatk = xhatkp1;
     Pk = Pkp1;
-    if gpsflag
-        xhatk_GPS = xhatkp1;
-        Pk_GPS = Pkp1;
-    end
 end
 
 
@@ -214,9 +184,6 @@ end
 % "1% of points may lie outside these bounds"
 alpha = 0.01;
 
-% Weighted average order of chi-squared distribution
-nz = (nz_INS/dt_INS+(nz_GPS+nz_INS)/dt_GPS)/(1/dt_INS+1/dt_GPS);
-
 % Chi-Squared Distribution Bounds for Innovation Statistic
 % These are displayed as red lines on the Innovation Statistic Mean Time
 % History. A certain percentage of points must lie within these bounds.
@@ -227,12 +194,12 @@ r2nu = chi2inv(1-alpha/2, nz);
 % These are displayed as magenta lines on the Consistency Test Time
 % Hisotry. The mean value of the Innovation Statistic must lie within these
 % bounds.
-r1nu_mean = chi2inv(alpha/2, Nx*nz)/Nx;
-r2nu_mean = chi2inv(1-alpha/2, Nx*nz)/Nx;
+r1nu_mean = chi2inv(alpha/2, N*nz)/N;
+r2nu_mean = chi2inv(1-alpha/2, N*nz)/N;
 
 % Chi-squared distribution test
-passcount = zeros(Nx,1);
-for k = 1:Nx
+passcount = zeros(N,1);
+for k = 1:N
     passcount(k) = (r1nu <= epsilonhist(k)) && (epsilonhist(k) <= r2nu);
 end
 passrate = 100*sum(passcount)/length(passcount);
@@ -261,7 +228,7 @@ hold off
 plot(xhist(1,:), xhist(4,:),'k.-', 'linewidth', 1.25, 'markersize', 10);
 hold on
 plot(xhathist(1,:), xhathist(4,:),'b.-', 'linewidth', 1.25, 'markersize', 10);
-plot(zhist_GPS(1,:), zhist_GPS(3,:),'ro', 'markersize', 5);
+plot(zhist(1,:), zhist(3,:),'ro', 'markersize', 5);
 title('Object Ground Track');
 xlabel('x1');
 ylabel('y1');
@@ -279,7 +246,7 @@ semilogy(r1nu_mean*ones(size(epsilonhist)), 'm--', 'linewidth', 1.75);
 semilogy(r2nu_mean*ones(size(epsilonhist)), 'm--', 'linewidth', 1.75);
 semilogy(mean(epsilonhist)*ones(size(epsilonhist)), 'b-.', ...
     'linewidth', 1);
-semilogy(nz_INS*ones(size(epsilonhist)), 'k-.', 'linewidth', 1);
+semilogy(nz*ones(size(epsilonhist)), 'k-.', 'linewidth', 1);
 hold off;
 title('Innovation Statistic Consistency Test Time History');
 ylabel('Innovation Statistic');
@@ -296,22 +263,22 @@ title('Acceleration Time History');
 legend({'True', '', '', 'Kalman', '', ''});
 grid on, grid minor
 
-% Acceleration Bias
+% Acceleration Bias Error
 figure(4);
 hold off
-plot(xhist(16:18,:)', 'r');
-hold on
 plot(xhathist(16:18,:)', 'b');
+hold on
+plot(xhist(16:18,:)', 'r');
 title('Acceleration Bias Time History');
 legend({'True', '', '', 'Kalman', '', ''});
 grid on, grid minor
 
-% Gyro Bias
+% Gyro Bias Error
 figure(5);
 hold off
-plot(xhist(19:21,:)', 'r');
-hold on
 plot(xhathist(19:21,:)', 'b');
+hold on
+plot(xhist(19:21,:)', 'r');
 title('Gyro Bias Time History');
 legend({'True', '', '', 'Kalman', '', ''});
 grid on, grid minor
