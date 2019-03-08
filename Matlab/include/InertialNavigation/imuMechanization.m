@@ -66,13 +66,13 @@ if nargin < 5
 end
 
 % State variables
-rk_e   = xk([1,3,5],1);    % Position
-vk_e   = xk([2,4,6],1);    % Velocity
-qk_e_b = xk(7:10,1);       % Orientation quaternion
-betaa  = xk([11,12,13],1); % Accel bias
-scalea = xk([14,15,16],1); % Accel Scale Factor
-betag  = xk([17,18,19],1); % Accel bias
-scaleg = xk([20,21,22],1); % Accel Scale Factor
+rk_e   = xk(1:3,1);   % Position
+vk_e   = xk(4:6,1);   % Velocity
+qk_e_b = xk(7:10,1);  % Orientation quaternion
+betaa  = xk(11:13,1); % Accel bias
+scalea = xk(14:16,1); % Accel Scale Factor
+betag  = xk(17:19,1); % Accel bias
+scaleg = xk(20:22,1); % Accel Scale Factor
 
 % Measurment variables
 dvf_m_raw = zk(1:3); % Raw Specific Force / Acceleration
@@ -125,10 +125,10 @@ rkp1_e = rk_e + vk_e*dt + 0.5*ak_e*dt^2;
 
 % Update State variables
 xkp1 = zeros(22,1);
-xkp1([1,3,5],1) = rkp1_e;      % Position
-xkp1([2,4,6],1) = vkp1_e;      % Velocity
-xkp1(7:10,1)    = qkp1_e_b;    % Orientation
-xkp1(11:22,1)   = xk(11:22,1); % Bias and scale factors
+xkp1(1:3,1)   = rkp1_e;      % Position
+xkp1(4:6,1)   = vkp1_e;      % Velocity
+xkp1(7:10,1)  = qkp1_e_b;    % Orientation
+xkp1(11:22,1) = xk(11:22,1); % Bias and scale factors
 
 % Output corrected acceleration and angular rate
 acc = ak_e;

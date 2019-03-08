@@ -22,7 +22,7 @@
 % measurement_model_GPS.m v 2019-03-02
 % 
 % @author: Matt Marti
-% @date: 2019-03-07
+% @date: 2019-03-08
 
 clear, clc, clear global
 
@@ -33,7 +33,7 @@ clear, clc, clear global
 % Measurement Delta Time
 dt_INS = .04;
 dt_GPS = 1;
-tof = 100;
+tof = 250;
 Nx = round(tof / dt_INS);
 Nz_INS = Nx;
 Nz_GPS = round(tof / dt_GPS);
@@ -132,7 +132,7 @@ xhatk = x0;
 % Initial Covariance estimate - This can be set pretty big and it will
 % converge fast for a linear system. Don't want it to be too small if you
 % think you're not accurate
-Pk = 1e-1*eye(nx);
+Pk = 1e1*eye(nx);
 
 % Preallocate data arrays
 xhathist = zeros(nx,Nx);
@@ -144,6 +144,7 @@ Qk = Q;
 
 % Run Filter
 kp1gps = 1;
+progressbar = waitbar(0, 'Progress');
 for kp1 = 1:Nx % Index by k+1
     k = kp1 - 1;
     gpsflag = ~mod(kp1-1,round(dt_GPS/dt_INS));
@@ -196,7 +197,11 @@ for kp1 = 1:Nx % Index by k+1
     % Iterate
     xhatk = xhatkp1;
     Pk = Pkp1;
+    if ~mod(kp1/Nx*100-1,1)
+        waitbar(kp1/Nx, progressbar);
+    end
 end
+close(progressbar);
 
 
 %% Chi-Squared Distribution Test for Filter Consistency
@@ -344,4 +349,15 @@ figure(10);
 hold off
 plot(xhathist(19:21,:)' - xhist(19:21,:)');
 title('Gyro Bias Error Time History');
+grid on, grid minor
+
+% Covariance condition number
+condhist = zeros(size(Phist,3),1);
+for i = 1:length(condhist)
+    condhist(i) = cond(squeeze(Phist(:,:,i)));
+end
+figure(11);
+hold off
+semilogy(condhist');
+title('Covariance Condition Number Time History');
 grid on, grid minor
