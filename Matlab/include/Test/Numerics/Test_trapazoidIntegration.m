@@ -6,7 +6,7 @@ function Test_trapazoidIntegration()
 % 
 % @author: Matt Marti
 % @date: 2019-03-04
-clc
+
 % Run the integration function
 xk = 5*ones(3,1);
 vk = 4*ones(3,1);

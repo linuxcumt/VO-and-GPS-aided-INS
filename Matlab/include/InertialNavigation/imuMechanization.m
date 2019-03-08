@@ -19,6 +19,13 @@ function [ xkp1, latlonalt, attitude, acc, gyr ] ...
 % dt        - double
 % xk        - 22 x 1 double matrix
 %             INS State vector
+%             [ rk_e;    - Position
+%               vk_e;    - Velocity
+%               qk_e_b;  - Orientation quaternion
+%               betaa;   - Accel bias
+%               scalea;  - Accel Scale Factor
+%               betag;   - Accel bias
+%               scaleg ] - Accel Scale Factor
 % zk        - 6 x 1 double matrix
 %             Measurement vector
 %             [ ax; ay; az; wx; wy; wz ]
@@ -61,11 +68,11 @@ end
 % State variables
 rk_e   = xk([1,3,5],1);    % Position
 vk_e   = xk([2,4,6],1);    % Velocity
-qk_e_b = xk(7:10,1);      % Orientation
-betaa  = xk([11,12,13],1); % Accel bias estimate
-scalea = xk([14,15,16],1); % Accel Scale Factor error estimate
-betag  = xk([17,18,19],1); % Accel bias estimate
-scaleg = xk([20,21,22],1); % Accel Scale Factor error estimate
+qk_e_b = xk(7:10,1);       % Orientation quaternion
+betaa  = xk([11,12,13],1); % Accel bias
+scalea = xk([14,15,16],1); % Accel Scale Factor
+betag  = xk([17,18,19],1); % Accel bias
+scaleg = xk([20,21,22],1); % Accel Scale Factor
 
 % Measurment variables
 dvf_m_raw = zk(1:3); % Raw Specific Force / Acceleration
