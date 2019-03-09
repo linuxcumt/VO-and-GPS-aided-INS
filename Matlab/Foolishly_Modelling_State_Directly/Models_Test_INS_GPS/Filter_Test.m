@@ -33,7 +33,7 @@ clear, clc, clear global
 % Measurement Delta Time
 dt_INS = .04;
 dt_GPS = 1;
-tof = 250;
+tof = 200;
 Nx = round(tof / dt_INS);
 Nz_INS = Nx;
 Nz_GPS = round(tof / dt_GPS);
@@ -132,7 +132,7 @@ xhatk = x0;
 % Initial Covariance estimate - This can be set pretty big and it will
 % converge fast for a linear system. Don't want it to be too small if you
 % think you're not accurate
-Pk = 1e1*eye(nx);
+Pk = 1e0*eye(nx);
 
 % Preallocate data arrays
 xhathist = zeros(nx,Nx);

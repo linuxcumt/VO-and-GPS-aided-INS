@@ -41,11 +41,11 @@ Gammak = zeros(nx,nv);
 % Integration Loop
 xkp1 = xk;
 t = 0;
-[ xdota ] = func(delt, xk, vk, 1);
+[ xdota, ~, ~ ] = func(delt, xk, vk, 1);
 for i = 1:n
     
     % Next state approximation
-    [ xdotb, dFb, dGammab ] = func(delt, xkp1, vk, dflag); 
+    [ xdotb, dFb, dGammab ] = func(delt, xkp1, vk, dflag);
     xkp1 = xkp1 + 0.5*delt*(xdotb + xdota);
     
     % Update partials

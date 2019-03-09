@@ -27,6 +27,7 @@ Test_latlon2ecef
 % InertialNavigation
 Test_gravitymodel
 Test_insMechanization
+Test_insErrorDynamicsModel
 
 
 %% Out
