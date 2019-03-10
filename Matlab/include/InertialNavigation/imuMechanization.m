@@ -6,6 +6,9 @@ function [ xkp1, latlonalt, attitude, acc, gyr ] ...
 % Eduardo Infante, "Development and Assessment of Loosely-Coupled INS Using
 % Smartphone Sensors".
 % 
+% IMPORTANT: Acceleration and Angular Rate are not used in calculations.
+% Those are inputs stored in zk. The function is gonna have to change some.
+% 
 % Measurments are assumed to be acceleration and angular rate, not
 % increments.
 % 
@@ -21,7 +24,9 @@ function [ xkp1, latlonalt, attitude, acc, gyr ] ...
 %             INS State vector
 %             [ rk_e;    - Position
 %               vk_e;    - Velocity
+%               ak_e;    - Acceleration - Not used in caclulations
 %               qk_e_b;  - Orientation quaternion
+%               omega_b; - Euler anglular velocity - Not used
 %               betaa;   - Accel bias
 %               scalea;  - Accel Scale Factor
 %               betag;   - Accel bias
@@ -69,10 +74,10 @@ end
 rk_e   = xk(1:3,1);   % Position
 vk_e   = xk(4:6,1);   % Velocity
 qk_e_b = xk(7:10,1);  % Orientation quaternion
-betaa  = xk(11:13,1); % Accel bias
-scalea = xk(14:16,1); % Accel Scale Factor
-betag  = xk(17:19,1); % Accel bias
-scaleg = xk(20:22,1); % Accel Scale Factor
+biasa  = xk(11:13,1); % Acc bias
+scalea = xk(14:16,1); % Acc Scale Factor
+biasg  = xk(17:19,1); % Gyr bias
+scaleg = xk(20:22,1); % Gry Scale Factor
 
 % Measurment variables
 dvf_m_raw = zk(1:3); % Raw Specific Force / Acceleration
@@ -85,8 +90,8 @@ dvf_b_raw = R_b_m*dvf_m_raw;
 theta_ib_b_raw = R_b_m*theta_ib_m_raw;
 
 % 1. Remove bias from raw measurements
-dvf_b = (dvf_b_raw*dt - betaa*dt) ./ (1 + scalea); % (Velocity increment)
-dtheta_b_ib = (theta_ib_b_raw*dt - betag*dt) ./ (1 + scaleg); % (Angle increment)
+dvf_b = dt * (dvf_b_raw - biasa) ./ (1 + scalea); % (Velocity increment)
+dtheta_b_ib = dt * (theta_ib_b_raw - biasg) ./ (1 + scaleg); % (Angle increment)
 
 % 2. Remove Earth rotation from gyro measurements
 R_e_b = quat2dircos(qk_e_b); % Body to ECEF rotation matrix
@@ -111,7 +116,7 @@ gf_e = gravitymodel(rk_e);
 wf_e = centrifugalmodel(rk_e);
 
 % 8. Apply coriolis and gravity models to acceleration
-dvk_e = dvf_e - dt * (gf_e + wf_e - cf_e);
+dvk_e = dvf_e + dt * (gf_e + wf_e - cf_e);
 ak_e = dvk_e / dt;
 
 % 9. & 10. Velocity and Position update

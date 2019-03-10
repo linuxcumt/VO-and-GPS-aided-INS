@@ -1,7 +1,7 @@
 %% Test_imuMechanization
 % 
 % Ensures that imuMechanization.m works the way I expect it to. The first
-% couple tests are in lieu of actual INS data
+% couple tests are in lieu of actual IMU data
 
 clear, clear global
 
@@ -24,7 +24,7 @@ assert(norm(g) == 0, 'Gravity force not 0');
 assert(norm(ac) == 0, 'Centrifugal force not 0');
 
 
-%% Test 1: Stationary INS doesn't move or rotate
+%% Test 1: Stationary IMU doesn't move or rotate
 
 % Parameters
 deltaflag = 0;
@@ -331,6 +331,50 @@ end
 assert(abs(attitude(1) - 180) < 1e-1, 'Bad heading');
 assert(abs(attitude(2) - 0) < 1e-1, 'Bad pitch');
 assert(abs(attitude(3) - 0) < 1e-1, 'Bad roll');
+
+
+%% Test 5: IMU
+
+% Turn gravity back on
+constants;
+
+% Parameters
+deltaflag = 0;
+dt = 1e-1;
+R_b_m = eye(3);
+
+% Initialize state
+x0 = x0_90_0_0;
+
+% Initialize measurements
+N = 1000;
+zhist = zeros(6,N);
+
+% Run simulation
+xhist = 1324*ones(22,N);
+xk = x0;
+for i = 1:N
+    zk = zhist(:,i);
+    [xkp1, latlonalt, attitude] ...
+        = imuMechanization(dt, xk, zk, R_b_m, deltaflag);
+    xhist(:,i) = xkp1;
+    xk = xkp1;
+end
+
+% Assert state does not change for stationary massless Earth
+p = 1e-2;
+for i = 1:N
+    for j = [3,6,11:22] % Ignore y axis due to coriolis
+        assert(abs(xhist(j,i) - x0(j)) < p, 'Bad state');
+    end
+end
+
+% Assert that the IMU fell
+g0 = norm(gravitymodel(x0(1:3)));
+xexpect = - g0*(dt*N) + x0(2); % Velocity
+assert(abs(xhist(4,end) - xexpect) < 2e1, 'IMU did not fall')
+xexpect = - 0.5*g0*(dt*N)^2 + x0(1); % Position
+assert(abs(xhist(1,end) - xexpect) < 1e2, 'IMU did not fall')
 
 
 %% Output

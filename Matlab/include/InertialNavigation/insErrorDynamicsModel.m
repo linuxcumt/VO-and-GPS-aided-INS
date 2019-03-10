@@ -18,8 +18,8 @@ function [ xkp1, Fk, Gammak ] ...
 %                   [ del_r_e;       - Position Error
 %                     del_v_e;       - Velocity Error
 %                     err_e;         - Misalignment Error
-%                     del_biasacc_e; - Acc Bias Drift Error
-%                     del_biasgyr_e; - Byr Bias Drift Error
+%                     del_biasacc;   - Acc Bias Drift Error
+%                     del_biasgyr;   - Byr Bias Drift Error
 %                     biasinitacc_e; - Initial Acc Bias Error
 %                     biasinitgyr_e; - Initial Gyr Bias Error
 %                     scaleacc_e;    - Acc Scale Factor Error
