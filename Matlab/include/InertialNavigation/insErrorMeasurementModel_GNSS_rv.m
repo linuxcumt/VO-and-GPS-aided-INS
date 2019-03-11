@@ -36,10 +36,10 @@ function [ zk, Hk ] = insErrorMeasurementModel_GNSS_rv( xk, wk )
 % @author: Matt Marti
 % @date: 2019-03-08
 
-nx = 21;
+nx = 27;
 nz = 6;
 
-Hk = zero(nz,nx);
+Hk = zeros(nz,nx);
 Hk(1:nz,1:nz) = eye(nz);
 
 zk = Hk * xk + wk;

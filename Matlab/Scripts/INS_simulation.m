@@ -25,9 +25,9 @@ nz_GPS = 6; % Number of measurements for GPS
 nInt = 10; % Number of integration steps
 
 % Measurement Times
-dt_IMU = .04; % IMU Sampling time period
+dt_IMU = .01;.04; % IMU Sampling time period
 dt_GPS = 1; % GPS Sampling time period
-tof = 100; % Time Of Flight
+tof = 10; % Time Of Flight
 Nx = round(tof / dt_IMU); % Number of IMU Samples
 Nz_IMU = Nx; % Number of IMU observations
 Nz_GPS = round(tof / dt_GPS); % Number of GPS observations
@@ -74,7 +74,7 @@ f = @(k, x, v, insstate) insErrorDynamicsModel( ...
         dt_IMU, x, v, insstate, beta_ba, beta_bg, beta_sa, beta_sg, nInt );
 
 % H - Measurement Model
-h = @(k, x, w) measurement_model_IMU( x, w );
+h = @(k, x) insErrorMeasurementModel_GNSS_rv( x, zeros(nz_GPS,1) );
 
 % IMU dynamics covariance (noise for manuevering)
 Qy = zeros(nvy,nvy);
@@ -132,10 +132,8 @@ for kp1 = 2:Nx
     llahist(:,kp1) = attitude;
     
     % Iterate
-    zyhist(:,kp1) = zk;
-    if ~mod(kp1/Nx*100-1,1)
-        waitbar(kp1/Nx, progressbar);
-    end
+    zyhist(:,k) = zk;
+    if ~mod(kp1/Nx*100-1,1), waitbar(kp1/Nx, progressbar); end
 end
 close(progressbar);
 
@@ -155,6 +153,10 @@ Sq = chol(Q)';
 v0 = Sq*randn(nv,1);
 vhist = Sq*randn(nv,Nz_GPS);
 
+% Generate IMU Measurement Noise
+Sr_IMU = chol(R_IMU);
+wyhist = Sr_IMU *randn(nz_IMU,Nz_IMU);
+
 % Preallocate
 xhist = zeros(nx,Nz_GPS);
 zhist_IMU = zeros(nz_IMU,Nz_IMU);
@@ -173,29 +175,36 @@ for kp1 = 2:Nx
     gpsflag = ~mod(kp1-1,round(dt_GPS/dt_IMU));
     k = kp1 - 1;
     
-    % INS state components
+    % IMU state components
     yk = yhist(:,k);
     
-    % Error state components
-    vk = vhist(:,kp1gps-1);
-    xk = xhist(:,kp1gps-1);
+    % IMU Measurement Noise
+    wk = wyhist(:,k);
     
     % IMU measurements, apply parameters and noise
-    a = zyhist(1:3,k) + vk(1:3);
-    g = zyhist(4:6,k) + vk(4:6);
-    ba = init_biasacc + k*dt_IMU*del_biasacc + vk(7:9);
-    bg = init_biasgyr + k*dt_IMU*del_biasgyr + vk(10:12);
-    sfa = scaleacc + vk(13:15);
-    sfg = scalegyr + vk(16:18);
-    za = (1 + sfa) .* (a + ba);
-    zg = (1 + sfg) .* (g + bg);
+    acc = zyhist(1:3,k) + wk(1:3);
+    gyr = zyhist(4:6,k) + wk(4:6);
+    ba = init_biasacc + dt_IMU*del_biasacc;
+    bg = init_biasgyr + dt_IMU*del_biasgyr;
+    sfa = scaleacc;
+    sfg = scalegyr;
+    za = (1 + sfa) .* (acc + ba);
+    zg = (1 + sfg) .* (gyr + bg);
     zhist_IMU(:,k) = [za; zg];
+    
+    % Update true bias / scale factors
+    yk(11:13) = ba;
+    yk(14:16) = sfa;
+    yk(17:19) = bg;
+    yk(20:22) = sfg;
+    yhist(:,k) = yk;
     
     % Error State Propagation
     if gpsflag
-        xkp1 = f(kp1gps-1, xk, vk, yk);
+        yhatkp1 = g(yk, zhist_IMU(:,k));
+        xkp1 = zeros(27,1);
+        xkp1(1:6) = yhist(1:6,kp1) - yhatkp1(1:6);
         xhist(:,kp1gps) = xkp1;
-        xk = xkp1;
     end
     
     % GPS Observation
@@ -205,12 +214,8 @@ for kp1 = 2:Nx
     end
     
     % Iterate
-    if gpsflag
-        kp1gps = kp1gps + 1;
-    end
-    if ~mod(kp1/Nx*100-1,1)
-        waitbar(kp1/Nx, progressbar);
-    end
+    if gpsflag, kp1gps = kp1gps + 1; end
+    if ~mod(kp1/Nx*100-1,1), waitbar(kp1/Nx, progressbar); end
 end
 close(progressbar);
 
@@ -218,7 +223,7 @@ close(progressbar);
 %% Run Filter on Time History
 
 % Preallocate data arrays
-xhathist = zeros(nx,Nx);
+xhathist = zeros(nx,Nz_GPS);
 Phist = zeros(nx,nx,Nx);
 epsilonhist = zeros(1,Nx);
 llahathist = zeros(size(llahist));
@@ -226,8 +231,8 @@ llahathist = zeros(size(llahist));
 % Initial state estimate - assume we are starting from the first GPS
 % measurement
 xhathist(:,1) = zeros(nx,1);
-xhathist(1:6,1) = zhist_GPS(:,1);
 yhathist = zeros(size(yhist));
+yhathist(:,1) = y0;
 zyhathist = zyhist;
 
 % Initial Covariance estimate - This can be set pretty big and it will
@@ -246,12 +251,11 @@ kf_INS = struct(...
     'k', 0, ...
     'xhatk', xhathist(:,1), ...
     'Pk', Phist(:,:,1), ...
-    'f', @(k,xk,uk,vk) f(k, xk, vk, insstate), ...
+    'f', @(k,xk,uk,vk,yk) f(k, xk, vk, yk), ...
     'Qk', Qk, ...
     'zkp1', 0, ...
-    'h', 0, ...
+    'h', h, ...
     'Rkp1', R_GPS, ...
-    'Gk', 0, ...
     'uk', 0);
 
 % Run Filter
@@ -262,41 +266,74 @@ for kp1 = 2:Nx % Index by k+1
     gpsflag = ~mod(kp1-1,round(dt_GPS/dt_IMU));
     
     % Obtain IMU measurements
-    zkp1 = zhist_IMU(:,kp1);
-    [ zbarkp1, Hkp1 ] = h_IMU(kp1, xbarkp1, 0);
-    Rkp1 = R_IMU;
+    zkp1_IMU = zhist_IMU(:,kp1);
+    zk_IMU = zhist_IMU(:,kp1);
     
     % Obtain GPS measurements
     if gpsflag
         zkp1_GPS = zhist_GPS(:,kp1gps);
-        [ zbarkp1_GPS, Hkp1_GPS ] = h_GPS(kp1gps, xbarkp1, 0);
-        kp1gps = kp1gps + 1;
     end
     
+    % Compute current IMU parameters
+    yk = yhathist(:,k);
+    biasa = yk(11:13);
+    sfa = yk(14:16);
+    biasg = yk(17:19);
+    sfg = yk(20:22);
+    
     % IMU State propagation
-    zk = zyhathist(:,k);
-    [ ykp1, Fk, Gammak ] = g(k, yk, zk);
+    ykp1 = g(yk, zk_IMU);
     
     % Estimate Error State
     if gpsflag
+        kf_INS.zkp1 = zkp1_GPS - ykp1(1:6);
+        kf_INS.f = @(k,xk,uk,vk) f(k, xk, vk, yk);
         [ xhatkp1, Pkp1, Wkp1, epsilonkp1, xbarkp1, Pbarkp1, Fk ] ...
                 = kalmaniter_extended( kf_INS );
         
+        % Partition INS Error State
+        del_r_e = xhatkp1(1:3);         % - Position Error
+        del_v_e = xhatkp1(4:6);         % - Velocity Error
+        err_e = xhatkp1(7:9);           % - Misalignment Error
+        del_biasacc = xhatkp1(10:12);   % - Acc Bias Drift Error
+        del_biasgyr = xhatkp1(13:15);   % - Byr Bias Drift Error
+        biasinitacc_e = xhatkp1(16:18); % - Initial Acc Bias Error
+        biasinitgyr_e = xhatkp1(19:21); % - Initial Gyr Bias Error
+        scaleacc_e = xhatkp1(22:24);    % - Acc Scale Factor Error
+        scalegyr_e = xhatkp1(25:27);    % - Gyr Scale Factor Error
+
+        % Subtract INS Errors
+        r = yk(1:3) - del_r_e;
+        v = yk(4:6) - del_v_e;
+        q = increQuatWithAngles( yk(7:10), -err_e );
+        ba = biasa - biasinitacc_e - dt_GPS*del_biasacc;
+        bg = biasg - biasinitgyr_e - dt_GPS*del_biasgyr;
+        sfa = sfa - scaleacc_e;
+        sfg = sfg - scalegyr_e;
+%         ykp1 = [ r; v; q; ba; sfa; bg; sfg ];
+        ykp1 = [ r; v; q; ykp1(11:end) ];
+        
     end
     
-    % Subtract INS Errors
+    % Update true INS state
+    yhathist(:,kp1) = ykp1;
     
-    % Save data
-    xhathist(:,kp1) = xhatkp1;
-    Phist(:,:,kp1) = Pkp1;
-    epsilonhist(kp1) = epsilonkp1;
+    % Save Error State data
+    if gpsflag
+        xhathist(:,kp1) = xhatkp1;
+        Phist(:,:,kp1) = Pkp1;
+        epsilonhist(kp1) = epsilonkp1;
+    end
     
     % Iterate
-    xhatk = xhatkp1;
-    Pk = Pkp1;
-    if ~mod(kp1/Nx*100-1,1)
-        waitbar(kp1/Nx, progressbar);
+    if gpsflag
+        xhatk = xhatkp1;
+        Pk = Pkp1;
+        kp1gps = kp1gps + 1;
+        kf_INS.xhatk = xhatkp1; 
+        kf_INS.Pk = Pkp1;
     end
+    if ~mod(kp1/Nx*100-1,1), waitbar(kp1/Nx, progressbar); end
 end
 close(progressbar);
 
@@ -358,7 +395,7 @@ hold off
 plot(yhist(2,:)-yhist(2,1), yhist(3,:)-yhist(3,1), ...
     'k.-', 'linewidth', 1.25, 'markersize', 10);
 hold on
-plot(yhathist(2,:)-yhist(1,1), yhathist(3,:)-yhist(3,1), ...
+plot(yhathist(2,:)-yhist(2,1), yhathist(3,:)-yhist(3,1), ...
     'b.-', 'linewidth', 1.25, 'markersize', 10);
 plot(zhist_GPS(2,:)-yhist(2,1), zhist_GPS(3,:)-yhist(3,1), ...
     'ro', 'markersize', 5);
@@ -389,9 +426,17 @@ grid on, grid minor;
 % Attitude Error
 figure(3);
 hold off
-plot(llahathist' - llahist');
+attdiff = llahathist - llahist;
+for i = 1:size(attdiff,2)
+    if attdiff(1,i) > 180
+        attdiff(1,i) = attdiff(1,i) - 360;
+    elseif attdiff(1,i) < -180
+        attdiff(1,i) = attdiff(1,i) + 360;
+    end
+end
+plot(attdiff');
 hold on
-title('Acceleration Time History');
+title('Attitude Error Time History');
 legend({'H', 'P', 'R'});
 grid on, grid minor
 

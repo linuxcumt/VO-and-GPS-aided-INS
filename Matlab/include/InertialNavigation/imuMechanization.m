@@ -24,9 +24,7 @@ function [ xkp1, latlonalt, attitude, acc, gyr ] ...
 %             INS State vector
 %             [ rk_e;    - Position
 %               vk_e;    - Velocity
-%               ak_e;    - Acceleration - Not used in caclulations
 %               qk_e_b;  - Orientation quaternion
-%               omega_b; - Euler anglular velocity - Not used
 %               betaa;   - Accel bias
 %               scalea;  - Accel Scale Factor
 %               betag;   - Accel bias
