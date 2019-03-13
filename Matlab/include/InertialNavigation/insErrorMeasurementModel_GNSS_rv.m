@@ -36,7 +36,7 @@ function [ zk, Hk ] = insErrorMeasurementModel_GNSS_rv( xk, wk )
 % @author: Matt Marti
 % @date: 2019-03-08
 
-nx = 27;
+nx = length(xk);
 nz = 6;
 
 Hk = zeros(nz,nx);

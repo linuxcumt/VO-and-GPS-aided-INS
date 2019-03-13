@@ -1,19 +1,19 @@
 function [ xkp1, Fk, Gammak ] ...
-    = insErrorDynamicsModel( dt, xk, vk, yk, f_e, beta_acc, beta_gyr, ...
+    = insErrorDynamicsModel_15state( dt, xk, vk, yk, f_e, beta_acc, beta_gyr, ...
                              beta_sf_acc, beta_sf_gyr, nInt )
 % INS Dead-Reckoning Error State Dynamics Model
 % Computes the rate of change of the error state and does numerical
 % integration to compute the state and evolution of the partial
 % derivatives.
 % 
-% This models the 27 element error state of the INS, includes modeling
-% the accel and gyro scale factor errors.
+% This models only acceleration errors and does not consider rotating
+% Earth.
 % 
 % INPUTS
 % dt          - double
 %               Delta time between state updates. Recommended to be INS
 %               measurement rate.
-% xk          - 27 x 1 double vector
+% xk          - 15 x 1 double vector
 %               State vector at time k
 %                   [ del_r_e;       - Position Error
 %                     del_v_e;       - Velocity Error
@@ -53,77 +53,64 @@ function [ xkp1, Fk, Gammak ] ...
 %               Number of steps for integration
 % 
 % OUTPUTS
-% xkp1        - 27 x 1 double vector
+% xkp1        - 15 x 1 double vector
 %               State vector at time k
-% Fk          - 27 x 27 double matrix
+% Fk          - 15 x 15 double matrix
 %               State Transition partial derivative
-% Gammak      - 27 x 18 double matrix
+% Gammak      - 15 x 18 double matrix
 %               State Noiise partial derivative
 % 
 % @author: Matt Marti
-% @date: 2019-03-09
+% @date: 2019-03-12
 
 % Constants
-global MUEARTH OMEGA_EARTH
-nx = 27;
-nv = 18;
+% global MUEARTH OMEGA_EARTH
+nx = length(xk);
+nv = length(vk);
 
-% Partition INS State
-rx_e = yk(1); % [m] INS ECEF X position
-ry_e = yk(2); % [m] INS ECEF Y position
-rz_e = yk(3); % [m] INS ECEF Z position
-fx_e = f_e(1); % [m/s/s] INS ECEF X acceleration
-fy_e = f_e(2); % [m/s/s] INS ECEF Y acceleration
-fz_e = f_e(3); % [m/s/s] INS ECEF Z acceleration
-
-% Gravity model
-re = sqrt( rx_e^2 + ry_e^2 + rz_e^2 );  % [m] INS Earth Center Distance
-goverr = MUEARTH / re^3;
-omegaEsq = OMEGA_EARTH^2;
-N_e = zeros(3,3);
-N_e(1,1) = goverr*( 3*(rx_e/re)^2 - 1 ) + omegaEsq;
-N_e(1,2) = goverr*( 3*rx_e*ry_e/re^2 );
-N_e(1,3) = goverr*( 3*rx_e*rz_e/re^2 );
-N_e(2,1) = N_e(1,2);
-N_e(2,2) = goverr*( 3*(ry_e/re)^2 - 1 ) + omegaEsq;
-N_e(2,3) = goverr*( 3*ry_e*rz_e/re^2 );
-N_e(3,1) = N_e(1,3);
-N_e(3,2) = N_e(2,3);
-N_e(3,3) = goverr*( 3*(rz_e/re)^2 - 1 );
-
-% ECEF Force frame skew semetric matrix
-F_e = [ 0, -fz_e, fy_e; fz_e, 0, -fx_e; -fy_e, fx_e, 0 ];
-
-% Earth rotation skew symmetric matrix
-Omega_e_ie = skewsym([ 0; 0; OMEGA_EARTH ]);
-
-% Body to ECEF Rotation matrix
-qk_e_b = yk(7:10,1);
-R_e_b = quat2dircos(qk_e_b); % Body to ECEF rotation matrix
-R_b_e = R_e_b';
+% % Partition INS State
+% rx_e = yk(1); % [m] INS ECEF X position
+% ry_e = yk(2); % [m] INS ECEF Y position
+% rz_e = yk(3); % [m] INS ECEF Z position
+% fx_e = f_e(1); % [m/s/s] INS ECEF X acceleration
+% fy_e = f_e(2); % [m/s/s] INS ECEF Y acceleration
+% fz_e = f_e(3); % [m/s/s] INS ECEF Z acceleration
+% 
+% % Gravity model
+% re = sqrt( rx_e^2 + ry_e^2 + rz_e^2 );  % [m] INS Earth Center Distance
+% goverr = MUEARTH / re^3;
+% omegaEsq = OMEGA_EARTH^2;
+% N_e = zeros(3,3);
+% N_e(1,1) = goverr*( 3*(rx_e/re)^2 - 1 ) + omegaEsq;
+% N_e(1,2) = goverr*( 3*rx_e*ry_e/re^2 );
+% N_e(1,3) = goverr*( 3*rx_e*rz_e/re^2 );
+% N_e(2,1) = N_e(1,2);
+% N_e(2,2) = goverr*( 3*(ry_e/re)^2 - 1 ) + omegaEsq;
+% N_e(2,3) = goverr*( 3*ry_e*rz_e/re^2 );
+% N_e(3,1) = N_e(1,3);
+% N_e(3,2) = N_e(2,3);
+% N_e(3,3) = goverr*( 3*(rz_e/re)^2 - 1 );
+% 
+% % ECEF Force frame skew semetric matrix
+% F_e = [ 0, -fz_e, fy_e; fz_e, 0, -fx_e; -fy_e, fx_e, 0 ];
+% 
+% % Earth rotation skew symmetric matrix
+% Omega_e_ie = skewsym([ 0; 0; OMEGA_EARTH ]);
+% 
+% % Body to ECEF Rotation matrix
+% qk_e_b = yk(7:10,1);
+% R_e_b = quat2dircos(qk_e_b); % Body to ECEF rotation matrix
+% R_b_e = R_e_b';
 
 % State Transition Partial Derivative
 Ak = zeros(nx,nx);
 Ak(1:3,4:6) = eye(3);
-Ak(4:6,1:3) = N_e;
-Ak(4:6,4:6) = -2*Omega_e_ie;
-Ak(4:6,7:9) = - F_e;
-Ak(4:6,10:12) = R_b_e;
-Ak(7:9,7:9) = -Omega_e_ie;
-Ak(7:9,13:15) = R_b_e;
-Ak(10:12,10:12) = -beta_acc;
-Ak(13:15,13:15) = -beta_gyr;
-Ak(22:24,22:24) = -beta_sf_acc;
-Ak(25:27,25:27) = -beta_sf_gyr;
+Ak(4:6,7:9) = -beta_acc;
+Ak(13:15,13:15) = -beta_sf_acc;
 
 % Noise rate derivative
 Dk = zeros(nx,nv);
-Dk(4:6,1:3) = R_b_e;
-Dk(7:9,4:6) = R_b_e;
-Dk(10:12,7:9) = eye(3);
-Dk(13:15,10:12) = eye(3);
-Dk(16:18,13:15) = eye(3);
-Dk(19:21,16:18) = eye(3);
+Dk(4:12,1:9) = eye(nv);
 
 % Integrate state
 func = @(delt, x, v, dflag) deal(Ak*x + Dk*v, Ak, Dk);
