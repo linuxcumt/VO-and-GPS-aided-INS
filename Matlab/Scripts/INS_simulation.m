@@ -17,7 +17,7 @@ constants;
 
 % Parameters
 nx = 27; % Dimension of error state
-ny = 22; % Dimension of IMU state
+ny = 22; % Dimension of INS state
 nv = 18; % Number of noise terms in error state
 nvy = 6; % Number of noise terms for manuevering noise
 nz_IMU = 6; % Number of measurements for IMU
@@ -225,6 +225,7 @@ xhathist = zeros(nx,Nz_GPS);
 Phist = zeros(nx,nx,Nx);
 epsilonhist = zeros(1,Nz_GPS);
 hprhathist = zeros(size(hprhist));
+zhist_Error = zeros(size(zhist_GPS));
 
 % Initial state estimate - assume we are starting from the first GPS
 % measurement
@@ -283,11 +284,13 @@ for kp1 = 2:Nx % Index by k+1
     
     % Estimate Error State
     if gpsflag
-        kf_INS.zkp1 = ykp1(1:6) - zkp1_GPS;
+        zhist_Error(:,kp1gps) = ykp1(1:6) - zkp1_GPS;
+        kf_INS.zkp1 = zhist_Error(:,kp1gps);
         kf_INS.f = @(k,xk,uk,vk) f(k, xk, vk, yk, acck);
         kf_INS.xhatk = zeros(nx,1);
         [ xhatkp1, Pkp1, Wkp1, epsilonkp1, xbarkp1, Pbarkp1, Fk ] ...
                 = kalmaniter_extended( kf_INS );
+        xhathist(:,kp1gps) = xhatkp1;
         
         % Partition INS Error State
         del_r_e = xhatkp1(1:3);         % - Position Error
@@ -503,4 +506,14 @@ figure(11);
 hold off
 semilogy(condhist');
 title('Covariance Condition Number Time History');
+grid on, grid minor
+
+% Estimated state error and measured state error
+figure(12);
+hold off
+plot(zhist_Error(1:3,:)', 'r');
+hold on
+plot(xhathist(1:3,:)', 'b');
+title('Error state');
+legend({'Measured', '', '', 'Estimated', '', ''});
 grid on, grid minor

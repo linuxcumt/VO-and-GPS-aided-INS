@@ -1,4 +1,4 @@
-%% INS_simulation_NoRotation
+%% INS_simulation_NoRotationNoBias
 % 
 % Simulation of estimating a trajectory of an object using a GPS aided
 % Inertial Navigation System. Based on the thesis by Eduardo Infante
@@ -6,7 +6,7 @@
 % Sensors"
 % 
 % Rotation and misalignment are not considered in this model so as to help
-% me develop the filter.
+% me develop the filter. Also accelerometer bias is not considered.
 % 
 % @author: Matt Marti
 % @date: 2019-03-12
@@ -19,9 +19,9 @@ clear, clc, clear global
 % Refer to the notebook for the models
 
 % Parameters
-nx = 15; % Dimension of error state
+nx = 6; % Dimension of error state
 ny = 12; % Dimension of INS state
-nv = 9; % Number of noise terms in error state
+nv = 3; % Number of noise terms in error state
 nvy = 3; % Number of noise terms for manuevering noise
 nz_IMU = 3; % Number of measurements for IMU
 nz_GPS = 6; % Number of measurements for GPS
@@ -29,8 +29,8 @@ nInt = 10; % Number of integration steps
 
 % Measurement Times
 dt_IMU = .01;.04; % IMU Sampling time period
-dt_GPS = 1; % GPS Sampling time period
-tof = 50; % Time Of Flight
+dt_GPS = .2; % GPS Sampling time period
+tof = 100; % Time Of Flight
 Nx = round(tof / dt_IMU); % Number of IMU Samples
 Nz_IMU = Nx; % Number of IMU observations
 Nz_GPS = round(tof / dt_GPS); % Number of GPS observations
@@ -54,8 +54,8 @@ sigma_sa = 1e-1;
 y0 = zeros(ny,1);
 y0(1:3,1) = 6400e3*[1; 0; 0]; % Position at lat / lon = 0,0
 y0(6) = 0.25; % Northward velocity
-q = [1; 1; 1; 1]; % Set heading, pitch, roll to 0
-q = q/norm(q); % Normalize quaternion
+% q = [1; 1; 1; 1]; % Set heading, pitch, roll to 0
+% q = q/norm(q); % Normalize quaternion
 % y0(7:10,1) = q; % Set Attitude
 
 % IMU Mechanization function = [ xkp1, latlonalt, attitude, acc, gyr ]
@@ -73,7 +73,7 @@ g5 = @(y, z) zeros(3,1);
 g = @(y,z) deal(g1(y,z),g2(y,z),g3(y,z),g4(y,z),g5(y,z));
 
 % F - Dynamics Propagation function (Error State)
-f = @(k, x, v, y, zIMU) insErrorDynamicsModel_15state( ...
+f = @(k, x, v, y, zIMU) insErrorDynamicsModel_6state( ...
         dt_IMU, x, v, y, zIMU, beta_ba, 0, beta_sa, 0, nInt );
 
 % H - Measurement Model
@@ -87,13 +87,13 @@ Qy(3,3) = 1e-7; % Accel
 
 % R - Measurement Noise Covariance
 R_GPS = 1e-1*diag([5;5;7;.1;.1;.2]);
-R_IMU = diag([1e-7;1e-7;1e-7]);
+R_IMU = 100*diag([1e-7;1e-7;1e-7]);
 
 % Q - Process Noise Covariance
 Q = zeros(nv,nv);
-Q(1:3,1:3) = 2*sigma_a^2*eye(3);2*sigma_a^2*beta_a*eye(3);
-Q(4:6,4:6) = 2*sigma_ba^2*eye(3);2*sigma_ba^2*beta_ba*eye(3);
-Q(7:9,7:9) = 2*sigma_sa^2*eye(3);2*sigma_sa^2*beta_sa*eye(3);
+Q(1:3,1:3) = 2*sigma_a^2*beta_a*eye(3);
+% Q(4:6,4:6) = 2*sigma_ba^2*beta_ba*eye(3);
+% Q(7:9,7:9) = 2*sigma_sa^2*beta_sa*eye(3);
 
 
 %% Generate Trajectory time history
@@ -105,7 +105,7 @@ vyhist = Sq_vy*randn(nvy,Nx);
 % Preallocate
 yhist = zeros(ny,Nx);
 yhist(:,1) = y0;
-zyhist = zeros(nvy,Nx);
+zhist_IMU_true = zeros(nvy,Nx);
 hprhist = zeros(3,Nx);
 % [ ~, attitude ] = rq2attitude( y0(1:3), y0(7:10) );
 % hprhist(:,1) = attitude;
@@ -130,7 +130,7 @@ for kp1 = 2:Nx
     hprhist(:,kp1) = attitude;
     
     % Iterate
-    zyhist(:,k) = zk;
+    zhist_IMU_true(:,k) = zk;
     if ~mod(kp1/Nx*100-1,1), waitbar(kp1/Nx, progressbar); end
 end
 close(progressbar);
@@ -178,7 +178,7 @@ for kp1 = 2:Nx+1
     wk = wyhist(:,k);
     
     % IMU measurements, apply parameters and noise
-    acc = zyhist(1:3,k) + wk(1:3);
+    acc = zhist_IMU_true(1:3,k) + wk(1:3);
 %     gyr = zyhist(4:6,k) + wk(4:6);
     ba = init_biasacc + k*dt_IMU*del_biasacc;
 %     bg = init_biasgyr + k*dt_IMU*del_biasgyr;
@@ -278,7 +278,7 @@ for kp1 = 2:Nx % Index by k+1
     yk = yhathist(:,k);
 %     yk(11:13) = bai + k*dt_IMU*bad;
 %     yk(14:16) = sfa;
-    yk(7:9) = bai + k*dt_IMU*bad;
+    yk(7:9) = bai + kp1*dt_IMU*bad;
     yk(10:12) = sfa;
 %     yk(17:19) = bgi + k*dt_IMU*bgd;
 %     yk(20:22) = sfg;
@@ -300,19 +300,19 @@ for kp1 = 2:Nx % Index by k+1
         del_r_e = xhatkp1(1:3);         % - Position Error
         del_v_e = xhatkp1(4:6);         % - Velocity Error
 %         err_e = xhatkp1(7:9);           % - Misalignment Error
-        del_biasacc = xhatkp1(7:9);   % - Acc Bias Drift Error
+%         del_biasacc = xhatkp1(7:9);   % - Acc Bias Drift Error
 %         del_biasgyr = xhatkp1(13:15);   % - Byr Bias Drift Error
-        biasinitacc_e = xhatkp1(10:12); % - Initial Acc Bias Error
+%         biasinitacc_e = xhatkp1(10:12); % - Initial Acc Bias Error
 %         biasinitgyr_e = xhatkp1(19:21); % - Initial Gyr Bias Error
-        scaleacc_e = xhatkp1(13:15);    % - Acc Scale Factor Error
+%         scaleacc_e = xhatkp1(13:15);    % - Acc Scale Factor Error
 %         scalegyr_e = xhatkp1(25:27);    % - Gyr Scale Factor Error
-        
-        % Subtract Errors from parameters
-        bai = bai - biasinitacc_e;
-        bad = bad - del_biasacc;
+%         
+%         % Subtract Errors from parameters
+%         bai = bai - biasinitacc_e;
+%         bad = bad - del_biasacc;
 %         bgi = bgi - biasinitgyr_e;
 %         bgd = bgd - del_biasgyr;
-        sfa = sfa - scaleacc_e;
+%         sfa = sfa - scaleacc_e;
 %         sfg = sfg - scalegyr_e;
         
         % Subtract Errors from state
@@ -455,16 +455,6 @@ plot(yhathist(7:9,:)', 'b');
 title('Acceleration Bias Time History');
 legend({'True', '', '', 'Kalman', '', ''});
 grid on, grid minor
-
-% % Gyro Bias
-% figure(5);
-% hold off
-% plot(yhist(17:19,:)', 'r');
-% hold on
-% plot(yhathist(17:19,:)', 'b');
-% title('Gyro Bias Time History');
-% legend({'True', '', '', 'Kalman', '', ''});
-% grid on, grid minor
 
 % Position Error
 figure(6);

@@ -1,15 +1,31 @@
-function pathsetup()
+function pathsetup(folder_path)
 %% pathsetup
 % 
 % Adds folders and subfolders from the include directory to the matlab
 % path.
 % 
 % @author: Matt Marti
-% @date: 2019-03-05
+% @date: 2019-03-13
 
-clear, clc, clear global
+% If no argument, add folders from here
+if nargin == 0
+    folder_path = '.';
+end
 
-recursiveadd('include');
+% Change '\' to '/'
+for i = 1:length(folder_path)
+    if folder_path(i) == '\'
+        folder_path(i) = '/';
+    end
+end
+
+% Add '/' to the end of the path name
+if folder_path(end) ~= '/'
+    folder_path = [ folder_path, '/' ];
+end
+
+% Recursively add directories to the path
+recursiveadd( [folder_path, 'include'] );
 
 end
 
